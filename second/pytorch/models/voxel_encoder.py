@@ -41,6 +41,7 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     max_num_shape[axis + 1] = -1
     max_num = torch.arange(
         max_num, dtype=torch.int, device=actual_num.device).view(max_num_shape)
+    # print(max_num.shape, actual_num.shape)
     # tiled_actual_num: [[3,3,3,3,3], [4,4,4,4,4], [2,2,2,2,2]]
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num
