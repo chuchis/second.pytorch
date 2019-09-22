@@ -195,8 +195,9 @@ class PillarGCNFeatureNet(nn.Module):
         # Forward pass through PFNLayers
         for pfn in self.pfn_layers:
             # print(features.shape)
-            features -= (1-mask)*1e10
+            features -= (1-mask.repeat(1,features.shape[1],1))*1e10
             features = batch_process(features, pfn, num_batches=20)
-            features *= mask
+            features *= mask.repeat(1,features.shape[1],1)
+            
             # print(features.shape)
         return features.squeeze()
