@@ -191,13 +191,17 @@ class PillarGCNFeatureNet(nn.Module):
         mask = torch.unsqueeze(mask, -1).type_as(features)
         # print(torch.sum(features[:,:,:3] - (features*mask)[:,:,:3]))
         features *= mask
+        # print(mask.shape, features.shape)
 
         # Forward pass through PFNLayers
         for pfn in self.pfn_layers:
             # print(features.shape)
-            features -= (1-mask.repeat(1,features.shape[1],1))*1e10
+            # print(mask.shape, features.shape)
+            features -= (1-mask.repeat(1,1,features.shape[2]))*1e10
             features = batch_process(features, pfn, num_batches=20)
-            features *= mask.repeat(1,features.shape[1],1)
+            # print(mask.shape, features.shape)
+            if not pfn.last_vfe:
+                features *= mask.repeat(1,1,features.shape[2])
             
             # print(features.shape)
         return features.squeeze()

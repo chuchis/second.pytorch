@@ -46,6 +46,9 @@ def get_paddings_indicator(actual_num, max_num, axis=0):
     # tiled_max_num: [[0,1,2,3,4], [0,1,2,3,4], [0,1,2,3,4]]
     paddings_indicator = actual_num.int() > max_num
     # paddings_indicator shape: [batch_size, max_num]
+    # print(max_num)
+    # print(paddings_indicator)
+    
     return paddings_indicator
 
 class VFELayer(nn.Module):
