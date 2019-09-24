@@ -117,17 +117,11 @@ class GCNLayer(nn.Module):
 
         # print("GCN Layer", torch.cuda.max_memory_allocated())
         # print(x.shape)
-        x_max = torch.max(x, dim=1, keepdim=True)[0]
+        
         # print("fwd done")
         # print(x_max.shape)
         # print("GCN Layer", torch.cuda.max_memory_allocated())
-        if self.last_vfe:
-            # return x_max
-            return x
-        else:
-            x_repeat = x_max.repeat(1, inputs.shape[1], 1)
-            x_concatenated = torch.cat([x, x_repeat], dim=2)
-            return x_concatenated
+        return x
 
 
 def hook_fn_back(m, i, o):
@@ -235,8 +229,13 @@ class PillarGCNFeatureNet(nn.Module):
             # print(mask)
             features_out = features_out * mask
             # print(mask.shape, features.shape)
+            features_max = torch.max(features_out, dim=1, keepdim=True)[0]
             if pfn.last_vfe:
-                features_out = torch.max(features_out, dim=1, keepdim=True)[0]
+                features_out = features_max
+            else:
+                # features_max = torch.max(x, dim=1, keepdim=True)[0]
+                features_repeat = features_max.repeat(1, inputs.shape[1], 1)
+                features_out = torch.cat([features_out, features_repeat], dim=2)
         # print(torch.cuda.max_memory_allocated())
         # print("GCN Net", torch.cuda.max_memory_allocated())
             # print(features.shape)
