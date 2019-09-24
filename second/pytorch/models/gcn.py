@@ -101,7 +101,8 @@ class GCNLayer(nn.Module):
         x_max = torch.max(x, dim=1, keepdim=True)[0]
         # print(x_max.shape)
         if self.last_vfe:
-            return x_max
+            # return x_max
+            return x
         else:
             x_repeat = x_max.repeat(1, inputs.shape[1], 1)
             x_concatenated = torch.cat([x, x_repeat], dim=2)
@@ -199,9 +200,10 @@ class PillarGCNFeatureNet(nn.Module):
             # print(mask.shape, features.shape)
             features -= (1-mask.repeat(1,1,features.shape[2]))*1e10
             features = batch_process(features, pfn, num_batches=20)
+            features *= mask.repeat(1,1,features.shape[2])
             # print(mask.shape, features.shape)
-            if not pfn.last_vfe:
-                features *= mask.repeat(1,1,features.shape[2])
+            if pfn.last_vfe:
+                features = torch.max(features, dim=1, keepdim=True)[0]
             
             # print(features.shape)
         return features.squeeze()
