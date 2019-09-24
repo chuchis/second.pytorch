@@ -234,7 +234,7 @@ class PillarGCNFeatureNet(nn.Module):
                 features_out = features_max
             else:
                 # features_max = torch.max(x, dim=1, keepdim=True)[0]
-                features_repeat = features_max.repeat(1, inputs.shape[1], 1)
+                features_repeat = features_max.repeat(1, features_out.shape[1], 1)
                 features_out = torch.cat([features_out, features_repeat], dim=2)
         # print(torch.cuda.max_memory_allocated())
         # print("GCN Net", torch.cuda.max_memory_allocated())
