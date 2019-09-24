@@ -49,12 +49,14 @@ class PFNLayer(nn.Module):
         self.norm = BatchNorm1d(self.units)
 
     def forward(self, inputs):
-
+        # torch.cuda.reset_max_memory_allocated()
+        # print(inputs.shape)
+        
         x = self.linear(inputs)
         x = self.norm(x.permute(0, 2, 1).contiguous()).permute(0, 2,
                                                                1).contiguous()
         x = F.relu(x)
-
+        # print("GCN Layer", torch.cuda.max_memory_allocated())
         x_max = torch.max(x, dim=1, keepdim=True)[0]
 
         if self.last_vfe:
