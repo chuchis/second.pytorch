@@ -15,18 +15,15 @@ from torchplus.tools import change_default_args
 import numpy as np 
 
 def knn(x, k):
-    # torch.cuda.reset_max_memory_allocated()
     inner = -2*torch.matmul(x.transpose(2, 1), x)
     xx = torch.sum(x**2, dim=1, keepdim=True)
     pairwise_distance = -xx - inner - xx.transpose(2, 1)
- 
+
     idx = pairwise_distance.topk(k=k, dim=-1)[1]   # (batch_size, num_points, k)
-    # print("knn", torch.cuda.max_memory_allocated())
     return idx
 
 
 def get_graph_feature(x, k=20, idx=None):
-    # torch.cuda.reset_max_memory_allocated()
     batch_size, num_dims, num_points = x.size()
     device = torch.device('cuda')
     x = x.view(batch_size, -1, num_points)
@@ -41,7 +38,6 @@ def get_graph_feature(x, k=20, idx=None):
     feature = feature.view(batch_size, num_points, k, num_dims) 
     x = x.view(batch_size, num_points, 1, num_dims).repeat(1, 1, k, 1)
     feature = torch.cat((feature-x, x), dim=3).permute(0, 3, 1, 2)
-    # print("graph feat", torch.cuda.max_memory_allocated())
     # print(feature.shape)
     return feature
 
@@ -81,54 +77,36 @@ class GCNLayer(nn.Module):
             out_channels = out_channels // 2
         self.units = out_channels
 
-        # if use_norm:
-        #     BatchNorm2d = change_default_args(
-        #         eps=1e-3, momentum=0.01)(nn.BatchNorm2d)
-        #     Conv2d = change_default_args(kernel_size=1, bias=False)(nn.Conv2d)
-        # else:
-        #     BatchNorm2d = Empty
-        #     Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
+        if use_norm:
+            BatchNorm2d = change_default_args(
+                eps=1e-3, momentum=0.01)(nn.BatchNorm2d)
+            Conv2d = change_default_args(kernel_size=1, bias=False)(nn.Conv2d)
+        else:
+            BatchNorm2d = Empty
+            Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
 
-        # LeakyReLU = change_default_args(negative_slope=0.2)(nn.LeakyReLU)
-
-        # self.conv = Conv2d(in_channels, self.units)
-        # self.norm = BatchNorm2d(self.units)
-        # self.relu = LeakyReLU()
+        LeakyReLU = change_default_args(negative_slope=0.2)(nn.LeakyReLU)
+        self.conv = Conv2d(in_channels, self.units)
+        self.norm = BatchNorm2d(self.units)
         self.k = 8
-        
-        self.seq = nn.Sequential(nn.Conv2d(in_channels, self.units,kernel_size=1, bias=False),
-                                 nn.BatchNorm2d(self.units, eps=1e-3, momentum=0.01),
-                                 nn.LeakyReLU(negative_slope=0.2))
-        # self.register_backward_hook(hook_fn_back)
-        # self.register_forward_hook(hook_fn_fwd)
+        self.relu = LeakyReLU()
 
     def forward(self, inputs):
-        # torch.cuda.reset_max_memory_allocated()
-        # print(inputs.shape)
         x = get_graph_feature(inputs.transpose(1,2), k=self.k)
-        # x = self.conv(x)
-        # x = self.norm(x)
-        # x = self.relu(x)
-        # print("GCN Layer", torch.cuda.max_memory_allocated())
-        x = self.seq(x)
-        # print("GCN Layer", torch.cuda.max_memory_allocated())
-
+        x = self.conv(x)
+        x = self.norm(x)
+        x = self.relu(x)
         x = x.max(dim=-1, keepdim=False)[0].transpose(1,2)
-
-        # print("GCN Layer", torch.cuda.max_memory_allocated())
         # print(x.shape)
-        
-        # print("fwd done")
+        x_max = torch.max(x, dim=1, keepdim=True)[0]
         # print(x_max.shape)
-        # print("GCN Layer", torch.cuda.max_memory_allocated())
-        return x
+        if self.last_vfe:
+            return x_max
+        else:
+            x_repeat = x_max.repeat(1, inputs.shape[1], 1)
+            x_concatenated = torch.cat([x, x_repeat], dim=2)
+            return x_concatenated
 
-
-def hook_fn_back(m, i, o):
-    print("backward: ",torch.cuda.memory_allocated())
-
-def hook_fn_fwd(m, i, o):
-    print("forward: ",torch.cuda.memory_allocated())
 
 @register_vfe
 class PillarGCNFeatureNet(nn.Module):
@@ -161,7 +139,7 @@ class PillarGCNFeatureNet(nn.Module):
 
         # Create PillarFeatureNet layers
         num_filters = [num_input_features] + list(num_filters)
-        self.pfn_layers = nn.ModuleList()
+        pfn_layers = []
         for i in range(len(num_filters) - 1):
             in_filters = num_filters[i]
             out_filters = num_filters[i + 1]
@@ -169,23 +147,20 @@ class PillarGCNFeatureNet(nn.Module):
                 last_layer = False
             else:
                 last_layer = True
-            self.pfn_layers.append(
+            pfn_layers.append(
                 GCNLayer(
                     in_filters*2, out_filters, use_norm, last_layer=last_layer))
-        # self.pfn_layers = nn.ModuleList(pfn_layers)
+        self.pfn_layers = nn.ModuleList(pfn_layers)
 
         # Need pillar (voxel) size and x/y offset in order to calculate pillar offset
         self.vx = voxel_size[0]
         self.vy = voxel_size[1]
         self.x_offset = self.vx / 2 + pc_range[0]
         self.y_offset = self.vy / 2 + pc_range[1]
-        # self.register_backward_hook(hook_fn_back)
-        # self.register_forward_hook(hook_fn_fwd)
-
 
     def forward(self, features, num_voxels, coors):
-        # torch.cuda.reset_max_memory_allocated()
         device = features.device
+
         dtype = features.dtype
         # print(features.shape, num_voxels.shape, coors.shape)
         # print(coors[0])
@@ -207,36 +182,19 @@ class PillarGCNFeatureNet(nn.Module):
         if self._with_distance:
             points_dist = torch.norm(features[:, :, :3], 2, 2, keepdim=True)
             features_ls.append(points_dist)
-        features_out = torch.cat(features_ls, dim=-1)
+        features = torch.cat(features_ls, dim=-1)
 
         # The feature decorations were calculated without regard to whether pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
-        voxel_count = features_out.shape[1]
+        voxel_count = features.shape[1]
         mask = get_paddings_indicator(num_voxels, voxel_count, axis=0)
-        mask = torch.unsqueeze(mask, -1).type_as(features_out)
+        mask = torch.unsqueeze(mask, -1).type_as(features)
         # print(torch.sum(features[:,:,:3] - (features*mask)[:,:,:3]))
-        features_out = features_out * mask
-        # print(mask.shape, features.shape)
+        features *= mask
 
         # Forward pass through PFNLayers
         for pfn in self.pfn_layers:
             # print(features.shape)
-            # print(mask.shape, features.shape)
-            features_out = features_out - (1-mask)*1e10
-            features_out = batch_process(features_out, pfn, num_batches=10)
-            # features_out = pfn(features_out)
-            # print(features.grad_fn)
-            # print(mask)
-            features_out = features_out * mask
-            # print(mask.shape, features.shape)
-            features_max = torch.max(features_out, dim=1, keepdim=True)[0]
-            if pfn.last_vfe:
-                features_out = features_max
-            else:
-                # features_max = torch.max(x, dim=1, keepdim=True)[0]
-                features_repeat = features_max.repeat(1, features_out.shape[1], 1)
-                features_out = torch.cat([features_out, features_repeat], dim=2)
-        # print(torch.cuda.max_memory_allocated())
-        # print("GCN Net", torch.cuda.max_memory_allocated())
+            features = batch_process(features, pfn, num_batches=20)
             # print(features.shape)
-        return features_out.squeeze()
+        return features.squeeze() 
