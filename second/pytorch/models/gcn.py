@@ -187,19 +187,16 @@ class DeepGCNFeatureNet(nn.Module):
         # Forward pass through PFNLayers
         prev_features_out = torch.zeros_like(mask)
         for pfn in self.pfn_layers:
-            print(features_out.shape, prev_features_out.shape)
             features_out = batch_process(features_out, pfn, num_batches=10)
             features_out = features_out * mask
-            features_out = features_out + prev_features_out
-            print(features_out.shape, prev_features_out.shape)
             features_max = torch.max(features_out, dim=1, keepdim=True)[0]
             if pfn.last_vfe:
                 features_out = features_max
             else:
+                features_out = features_out + prev_features_out
                 prev_features_out = features_out
                 features_repeat = features_max.repeat(1, features_out.shape[1], 1)
                 features_out = torch.cat([features_out, features_repeat], dim=2)
-            print(features_out.shape, prev_features_out.shape)
         return features_out.squeeze() 
 
 @register_vfe
