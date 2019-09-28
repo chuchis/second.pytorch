@@ -195,16 +195,18 @@ class DeepGCNFeatureNet(nn.Module):
         mask = torch.unsqueeze(mask, -1).type_as(features_out)
         # print(torch.sum(features[:,:,:3] - (features*mask)[:,:,:3]))
         features_out = features_out * mask
-        prev_features_out = torch.zeros_like(features_out)
         # Forward pass through PFNLayers
+		prev_features_out = torch.zeros_like(mask)
         for pfn in self.pfn_layers:
             features_out = batch_process(features_out+prev_features_out, pfn, num_batches=10)
             features_out = features_out * mask
-            prev_features_out = features_out
+            features_out = features_out + prev_features_out
+            
             features_max = torch.max(features_out, dim=1, keepdim=True)[0]
             if pfn.last_vfe:
                 features_out = features_max
             else:
+				prev_features_out = features_out
                 features_repeat = features_max.repeat(1, features_out.shape[1], 1)
                 features_out = torch.cat([features_out, features_repeat], dim=2)
         return features_out.squeeze() 
