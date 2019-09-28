@@ -97,6 +97,7 @@ class GCNLayer(nn.Module):
     def forward(self, inputs):
         x = get_graph_feature(inputs.transpose(1,2), k=self.k)
         x = self.seq(x)
+        x = x.max(dim=-1, keepdim=False)[0].transpose(1,2)
         return x
 
 @register_vfe
@@ -186,11 +187,9 @@ class DeepGCNFeatureNet(nn.Module):
         # Forward pass through PFNLayers
         prev_features_out = torch.zeros_like(mask)
         for pfn in self.pfn_layers:
-            print(features_out.shape, prev_features_out.shape)
             features_out = batch_process(features_out, pfn, num_batches=10)
             features_out = features_out * mask
             features_out = features_out + prev_features_out
-            print(features_out.shape, prev_features_out.shape)
             features_max = torch.max(features_out, dim=1, keepdim=True)[0]
             if pfn.last_vfe:
                 features_out = features_max
