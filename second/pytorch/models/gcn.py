@@ -198,7 +198,7 @@ class DeepGCNFeatureNet(nn.Module):
         # Forward pass through PFNLayers
         prev_features_out = torch.zeros_like(mask)
         for pfn in self.pfn_layers:
-            features_out = batch_process(features_out+prev_features_out, pfn, num_batches=10)
+            features_out = batch_process(features_out, pfn, num_batches=10)
             features_out = features_out * mask
             features_out = features_out + prev_features_out
             
