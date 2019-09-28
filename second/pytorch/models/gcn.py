@@ -77,25 +77,29 @@ class GCNLayer(nn.Module):
             out_channels = out_channels // 2
         self.units = out_channels
 
-        if use_norm:
-            BatchNorm2d = change_default_args(
-                eps=1e-3, momentum=0.01)(nn.BatchNorm2d)
-            Conv2d = change_default_args(kernel_size=1, bias=False)(nn.Conv2d)
-        else:
-            BatchNorm2d = Empty
-            Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
+        # if use_norm:
+        #     BatchNorm2d = change_default_args(
+        #         eps=1e-3, momentum=0.01)(nn.BatchNorm2d)
+        #     Conv2d = change_default_args(kernel_size=1, bias=False)(nn.Conv2d)
+        # else:
+        #     BatchNorm2d = Empty
+        #     Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
 
-        LeakyReLU = change_default_args(negative_slope=0.2)(nn.LeakyReLU)
-        self.conv = Conv2d(in_channels, self.units)
-        self.norm = BatchNorm2d(self.units)
+        # LeakyReLU = change_default_args(negative_slope=0.2)(nn.LeakyReLU)
+        # self.conv = Conv2d(in_channels, self.units)
+        # self.norm = BatchNorm2d(self.units)
+        # self.relu = LeakyReLU()
+        self.seq = nn.Sequential(nn.Conv2d(in_channels, self.units,kernel_size=1, bias=False),
+                                 nn.BatchNorm2d(self.units, eps=1e-3, momentum=0.01),
+                                 nn.LeakyReLU(negative_slope=0.2))
         self.k = 8
-        self.relu = LeakyReLU()
 
     def forward(self, inputs):
         x = get_graph_feature(inputs.transpose(1,2), k=self.k)
-        x = self.conv(x)
-        x = self.norm(x)
-        x = self.relu(x)
+        # x = self.conv(x)
+        # x = self.norm(x)
+        # x = self.relu(x)
+        x = self.seq(x)
         x = x.max(dim=-1, keepdim=False)[0].transpose(1,2)
         # print(x.shape)
         x_max = torch.max(x, dim=1, keepdim=True)[0]
@@ -159,6 +163,7 @@ class PillarGCNFeatureNet(nn.Module):
         self.y_offset = self.vy / 2 + pc_range[1]
 
     def forward(self, features, num_voxels, coors):
+        # print(torch.sum(num_voxels)/2)
         device = features.device
 
         dtype = features.dtype
@@ -182,19 +187,32 @@ class PillarGCNFeatureNet(nn.Module):
         if self._with_distance:
             points_dist = torch.norm(features[:, :, :3], 2, 2, keepdim=True)
             features_ls.append(points_dist)
-        features = torch.cat(features_ls, dim=-1)
+        features_out = torch.cat(features_ls, dim=-1)
 
         # The feature decorations were calculated without regard to whether pillar was empty. Need to ensure that
         # empty pillars remain set to zeros.
-        voxel_count = features.shape[1]
+        voxel_count = features_out.shape[1]
         mask = get_paddings_indicator(num_voxels, voxel_count, axis=0)
-        mask = torch.unsqueeze(mask, -1).type_as(features)
+        mask = torch.unsqueeze(mask, -1).type_as(features_out)
         # print(torch.sum(features[:,:,:3] - (features*mask)[:,:,:3]))
-        features *= mask
+        features_out = features_out * mask
 
         # Forward pass through PFNLayers
         for pfn in self.pfn_layers:
             # print(features.shape)
-            features = batch_process(features, pfn, num_batches=20)
+            # features = batch_process(features, pfn, num_batches=20)
+            features_out = batch_process(features_out, pfn, num_batches=10)
+            # features_out = pfn(features_out)
+            # print(features.grad_fn)
+            # print(mask)
+            features_out = features_out * mask
+            # print(mask.shape, features.shape)
+            features_max = torch.max(features_out, dim=1, keepdim=True)[0]
+            if pfn.last_vfe:
+                features_out = features_max
+            else:
+                # features_max = torch.max(x, dim=1, keepdim=True)[0]
+                features_repeat = features_max.repeat(1, features_out.shape[1], 1)
+                features_out = torch.cat([features_out, features_repeat], dim=2)
             # print(features.shape)
-        return features.squeeze() 
+        return features_out.squeeze() 
