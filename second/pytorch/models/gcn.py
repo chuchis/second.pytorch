@@ -201,7 +201,7 @@ class DeepGCNFeatureNet(nn.Module):
             features_out = batch_process(features_out, pfn, num_batches=10)
             features_out = features_out * mask
             features_out = features_out + prev_features_out
-            
+            print(features_out.shape, prev_features_out.shape)
             features_max = torch.max(features_out, dim=1, keepdim=True)[0]
             if pfn.last_vfe:
                 features_out = features_max
