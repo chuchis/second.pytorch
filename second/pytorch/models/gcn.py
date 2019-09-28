@@ -96,20 +96,8 @@ class GCNLayer(nn.Module):
 
     def forward(self, inputs):
         x = get_graph_feature(inputs.transpose(1,2), k=self.k)
-        # x = self.conv(x)
-        # x = self.norm(x)
-        # x = self.relu(x)
         x = self.seq(x)
-        x = x.max(dim=-1, keepdim=False)[0].transpose(1,2)
-        # print(x.shape)
-        x_max = torch.max(x, dim=1, keepdim=True)[0]
-        # print(x_max.shape)
-        if self.last_vfe:
-            return x_max
-        else:
-            x_repeat = x_max.repeat(1, inputs.shape[1], 1)
-            x_concatenated = torch.cat([x, x_repeat], dim=2)
-            return x_concatenated
+        return x
 
 @register_vfe
 class DeepGCNFeatureNet(nn.Module):
