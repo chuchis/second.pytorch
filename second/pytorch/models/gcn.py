@@ -77,20 +77,16 @@ class GCNLayer(nn.Module):
             out_channels = out_channels // 2
         self.units = out_channels
 
-        # if use_norm:
-        #     BatchNorm2d = change_default_args(
-        #         eps=1e-3, momentum=0.01)(nn.BatchNorm2d)
-        #     Conv2d = change_default_args(kernel_size=1, bias=False)(nn.Conv2d)
-        # else:
-        #     BatchNorm2d = Empty
-        #     Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
-
-        # LeakyReLU = change_default_args(negative_slope=0.2)(nn.LeakyReLU)
-        # self.conv = Conv2d(in_channels, self.units)
-        # self.norm = BatchNorm2d(self.units)
-        # self.relu = LeakyReLU()
-        self.seq = nn.Sequential(nn.Conv2d(in_channels, self.units,kernel_size=1, bias=False),
-                                 nn.BatchNorm2d(self.units, eps=1e-3, momentum=0.01),
+        if use_norm:
+            BatchNorm2d = change_default_args(
+                eps=1e-3, momentum=0.01)(nn.BatchNorm2d)
+            Conv2d = change_default_args(kernel_size=1, bias=False)(nn.Conv2d)
+        else:
+            BatchNorm2d = Empty
+            Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
+        
+        self.seq = nn.Sequential(Conv2d,
+                                 BatchNorm2d,
                                  nn.LeakyReLU(negative_slope=0.2))
         self.k = 8
 
