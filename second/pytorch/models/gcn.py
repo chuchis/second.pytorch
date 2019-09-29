@@ -84,9 +84,9 @@ class GCNLayer(nn.Module):
         else:
             BatchNorm2d = Empty
             Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
-        
-        self.seq = nn.Sequential(Conv2d,
-                                 BatchNorm2d,
+            
+        self.seq = nn.Sequential(Conv2d(in_channels, self.units),
+                                 BatchNorm2d(self.units),
                                  nn.LeakyReLU(negative_slope=0.2))
         self.k = 8
 
