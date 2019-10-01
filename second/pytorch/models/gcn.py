@@ -84,7 +84,7 @@ class GCNLayer(nn.Module):
         else:
             BatchNorm2d = Empty
             Conv2d = change_default_args(kernel_size=1, bias=True)(nn.Conv2d)
-            
+
         self.seq = nn.Sequential(Conv2d(in_channels, self.units),
                                  BatchNorm2d(self.units),
                                  nn.LeakyReLU(negative_slope=0.2))
@@ -147,6 +147,7 @@ class DeepGCNFeatureNet(nn.Module):
         self.y_offset = self.vy / 2 + pc_range[1]
 
     def forward(self, features, num_voxels, coors):
+
         # print(torch.sum(num_voxels)/2)
         device = features.device
 
@@ -182,6 +183,7 @@ class DeepGCNFeatureNet(nn.Module):
         features_out = features_out * mask
         # Forward pass through PFNLayers
         prev_features_out = torch.zeros_like(mask)
+        # print(prev_features_out.requires_grad)
         for pfn in self.pfn_layers:
             features_out = batch_process(features_out, pfn, num_batches=10)
             features_out = features_out * mask
@@ -246,7 +248,9 @@ class PillarGCNFeatureNet(nn.Module):
         self.y_offset = self.vy / 2 + pc_range[1]
 
     def forward(self, features, num_voxels, coors):
-        # print(torch.sum(num_voxels)/2)
+        # print(coors.shape, num_voxels.shape, features.shape)
+        # print(torch.max(num_voxels), torch.min(num_voxels), torch.mean(num_voxels.float()), num_voxels.shape)
+        # print(torch.sum(num_voxels>=8).float()/num_voxels.shape[0])
         device = features.device
 
         dtype = features.dtype
