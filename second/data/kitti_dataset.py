@@ -167,7 +167,7 @@ class KittiDataset(Dataset):
         if "image_idx" in input_dict["metadata"]:
             example["metadata"] = input_dict["metadata"]
         if "anchors_mask" in example:
-            example["anchors_mask"] = example["anchors_mask"].astype(np.uint8)
+            example["anchors_mask"] = example["anchors_mask"].astype(np.bool)
         return example
 
     def get_sensor_data(self, query):
