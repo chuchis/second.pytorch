@@ -397,7 +397,7 @@ class VoxelNet(nn.Module):
         if "anchors_mask" not in example:
             batch_anchors_mask = [None] * batch_size
         else:
-            batch_anchors_mask = example["anchors_mask"].view(batch_size, -1)
+            batch_anchors_mask = example["anchors_mask"].view(batch_size, -1).bool()
 
         t = time.time()
         batch_box_preds = preds_dict["box_preds"]
